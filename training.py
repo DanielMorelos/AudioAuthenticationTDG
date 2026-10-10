@@ -274,7 +274,7 @@ class AverageValue:
         avg = self.total / self.count if self.count > 0 else 0.0
         return torch.tensor(avg)
     
-    def to(self, device): pass  # for compatibility with torcheval.Metric
+    def to(self, device): pass  
 
 
 #----------------------#
