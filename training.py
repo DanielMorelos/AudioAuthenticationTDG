@@ -1,3 +1,4 @@
+import os
 import torch
 from torch import nn, optim
 from torch.utils.data import DataLoader
@@ -35,17 +36,35 @@ class Trainer:
         """Sets the function that customizes how to run the model on a batch of training data."""
         self._adapter = adapter or ModelAdapter()
 
-    def fit(self, model: nn.Module, loader: DataLoader, loss_fn: nn.Module, optimizer: optim.Optimizer, epochs: int, valid_loader: DataLoader = None) -> dict:
+    def fit(self, model: nn.Module, loader: DataLoader, loss_fn: nn.Module, optimizer: optim.Optimizer, epochs: int,
+            valid_loader: DataLoader = None,
+            scheduler: optim.lr_scheduler._LRScheduler = None,
+            early_stopping_patience: int = None,
+            early_stopping_min_delta: float = 0.0,
+            grad_clip_norm: float = None,
+            checkpoint_path: str = None,          # last epoch checkpoint path
+            best_checkpoint_path: str = None,     
+            checkpoint_every: int = 1) -> dict:  #checkpoint every N epochs
         """
         Trains the model on the given data.
         Returns a dictionary with the history over epochs of the following metrics:
         - average loss function on the training set.
         - average loss function on the validation set (if provided).
         - other metrics on the validation set (if provided).
+        - scheduler: stepped with valid_loss every epoch (requires valid_loader).
+        - early_stopping_patience: stops training if valid_loss doesn't improve for N epochs.
+        - grad_clip_norm: gradient norm clipping applied before each optimizer.step().
         """
         model_device = next(model.parameters()).device
         model.to(self._device), loss_fn.to(self._device)
-        history = _train_loop(model, loader, loss_fn, optimizer, epochs, self._device, self._adapter, valid_loader, self._metrics)
+        history = _train_loop(model, loader, loss_fn, optimizer, epochs, self._device, self._adapter,
+                               valid_loader, self._metrics,
+                               scheduler=scheduler,
+                               early_stopping_patience=early_stopping_patience,
+                               early_stopping_min_delta=early_stopping_min_delta,
+                               grad_clip_norm=grad_clip_norm,checkpoint_path=checkpoint_path,        
+                               best_checkpoint_path=best_checkpoint_path,
+                               checkpoint_every=checkpoint_every)  
         model.to(model_device), loss_fn.to(model_device)
         return history
 
@@ -105,7 +124,14 @@ def _train_loop(model: nn.Module,
                 device: torch.device,
                 adapter: ModelAdapter,
                 valid_loader: DataLoader = None,
-                metrics: dict[str, Metric] = {}) -> dict:
+                metrics: dict[str, Metric] = {},
+                scheduler = None,
+                early_stopping_patience: int = None,
+                early_stopping_min_delta: float = 0.0,
+                grad_clip_norm: float = None,
+                checkpoint_path: str = None,
+                best_checkpoint_path: str = None,
+                checkpoint_every: int = 1) -> dict:
 
     print(f"===== Training on {device} device =====")
 
@@ -115,8 +141,39 @@ def _train_loop(model: nn.Module,
     # Initialize history
     history = defaultdict(list)
 
+    # Early stopping state
+    best_valid_loss = float('inf')
+    best_model_state = None
+    epochs_without_improvement = 0
+
+    # Resume checkpoint, if it exists
+    starting_epoch = 0
+    if checkpoint_path is not None and os.path.exists(checkpoint_path):
+        ckpt = torch.load(checkpoint_path, map_location=device)
+        model.load_state_dict(ckpt['model_state_dict'])
+        optimizer.load_state_dict(ckpt['optimizer_state_dict'])
+        if ckpt.get('loss_fn_state_dict') is not None:
+            loss_fn.load_state_dict(ckpt['loss_fn_state_dict'])
+        if scheduler is not None and ckpt.get('scheduler_state_dict') is not None:
+            scheduler.load_state_dict(ckpt['scheduler_state_dict'])
+        history = defaultdict(list, ckpt['history'])
+        best_valid_loss = ckpt.get('best_valid_loss', float('inf'))
+        epochs_without_improvement = ckpt.get('epochs_without_improvement', 0)
+        starting_epoch = ckpt['epoch'] + 1
+        print(f"Resuming training from epoch {starting_epoch + 1} "
+                f"(checkpoint: {checkpoint_path})")
+    if (early_stopping_patience is not None
+            and epochs_without_improvement >= early_stopping_patience
+            and starting_epoch < epochs):
+        print(f"Early stopping was already triggered in a previous run "
+                f"(no improvement in {epochs_without_improvement} epochs). Skipping retraining.")
+        if best_checkpoint_path is not None and os.path.exists(best_checkpoint_path):
+            best_ckpt = torch.load(best_checkpoint_path, map_location=device)
+            model.load_state_dict(best_ckpt['model_state_dict'])
+        metrics.pop('valid_loss', None)
+        return history
     # Training loop
-    for epoch in range(epochs):
+    for epoch in range(starting_epoch, epochs):
 
         # Set model to training mode
         model.train()
@@ -127,7 +184,7 @@ def _train_loop(model: nn.Module,
             # Loop over batches in the training set
             train_loss = 0
             for batch in train_loader:
-                train_loss += _train_step(model, batch, loss_fn, optimizer, device, adapter)
+                train_loss += _train_step(model, batch, loss_fn, optimizer, device, adapter, grad_clip_norm)
 
                 # Update progress bar after each batch
                 bar.update()
@@ -145,6 +202,58 @@ def _train_loop(model: nn.Module,
         for name, value in results.items():
             value = value.item() if isinstance(value, torch.Tensor) else value
             history[name].append(value)
+        history['lr'].append(optimizer.param_groups[0]['lr'])
+        # Scheduler (ReduceLROnPlateau) 
+        if scheduler is not None and 'valid_loss' in results:
+            scheduler.step(results['valid_loss'])
+
+        #  Save checkpoint for the last epoch
+        if checkpoint_path is not None and (epoch + 1) % checkpoint_every == 0:
+            torch.save({
+                'epoch': epoch,
+                'model_state_dict': model.state_dict(),
+                'optimizer_state_dict': optimizer.state_dict(),
+                'loss_fn_state_dict': loss_fn.state_dict(),
+                'scheduler_state_dict': scheduler.state_dict() if scheduler is not None else None,
+                'history': dict(history),
+                'best_valid_loss': best_valid_loss,
+                'epochs_without_improvement': epochs_without_improvement,
+            }, checkpoint_path)
+        #  Best model checkpoint 
+        if 'valid_loss' in results:
+            valid_loss_current = results['valid_loss']
+            valid_loss_current = valid_loss_current.item() if isinstance(valid_loss_current, torch.Tensor) else valid_loss_current
+
+            previous_best_valid_loss = best_valid_loss  # snapshot before updating, used for the patience check below
+
+            # Checkpoint selection: strict comparison, independent of early_stopping_min_delta
+            if valid_loss_current < previous_best_valid_loss:
+                best_valid_loss = valid_loss_current
+                best_model_state = {k: v.detach().clone() for k, v in model.state_dict().items()}
+
+                if best_checkpoint_path is not None:
+                    torch.save({
+                        'epoch': epoch,
+                        'model_state_dict': best_model_state,
+                        'valid_loss': best_valid_loss,
+                    }, best_checkpoint_path)
+
+            # Early stopping patience: only resets on a "significant" improvement
+            if valid_loss_current < previous_best_valid_loss - early_stopping_min_delta:
+                epochs_without_improvement = 0
+            else:
+                epochs_without_improvement += 1
+
+        #  Early stopping 
+        if early_stopping_patience is not None and 'valid_loss' in results:
+            if epochs_without_improvement >= early_stopping_patience:
+                print(f"Early stopping at epoch {epoch+1} (no improvement in {early_stopping_patience} epochs). "
+                        f"Best valid_loss: {best_valid_loss:.4f}")
+                break
+
+    
+    if best_model_state is not None:
+        model.load_state_dict(best_model_state)
 
     # Remove loss function from metrics
     metrics.pop('valid_loss', None)
@@ -157,7 +266,8 @@ def _train_step(model: nn.Module,
                 loss_fn: nn.Module,
                 optimizer: optim.Optimizer,
                 device: torch.device,
-                adapter: ModelAdapter) -> float:
+                adapter: ModelAdapter,
+                grad_clip_norm: float = None) -> float:
     """
     Trains the model for one epoch and returns the loss value.
     """    
@@ -170,6 +280,10 @@ def _train_step(model: nn.Module,
 
     # Backward pass
     loss.backward()
+
+    # Gradient clipping
+    if grad_clip_norm is not None:
+        torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=grad_clip_norm)
 
     # Optimizer step
     optimizer.step()
@@ -274,7 +388,7 @@ class AverageValue:
         avg = self.total / self.count if self.count > 0 else 0.0
         return torch.tensor(avg)
     
-    def to(self, device): pass  
+    def to(self, device): pass  # for compatibility with torcheval.Metric
 
 
 #----------------------#
