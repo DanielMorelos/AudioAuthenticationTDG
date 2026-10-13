@@ -1,0 +1,146 @@
+\section*{Anexo A. Descripción Detallada de la Cadena de Procesamiento para la Generación de Empalmes con Inteligencia Artificial}
+
+\subsection*{A.1 Detección de Zonas de Inserción mediante Detección de Actividad Vocal}
+
+La inserción del fragmento sintético debe realizarse en una región donde no exista
+actividad vocal activa, de forma que la transición entre el contenido original y el
+fragmento sintetizado ocurra en un punto de silencio natural. Con este propósito se
+empleó Silero VAD \cite{silero_vad}, un modelo neuronal de detección de actividad
+vocal (\textit{Voice Activity Detection}, VAD) que opera a nivel de \textit{frame} de
+10~ms, ofreciendo mayor robustez ante variaciones en el nivel de ruido de fondo en
+comparación con enfoques basados en umbrales de energía.
+
+A partir del mapa de actividad vocal generado, se extrajeron las zonas de silencio
+confirmado aplicando un margen de seguridad de 120~ms alrededor de cada segmento
+de voz, con el fin de evitar cortes en los bordes del habla. Únicamente las zonas con
+duración mínima de 400~ms fueron consideradas candidatas. La zona de empalme fue
+seleccionada aleatoriamente entre las candidatas ubicadas en el rango central del audio,
+comprendido entre el 25\% y el 75\% de la duración total, evitando que el modelo de
+detección aprenda patrones asociados a posiciones fijas dentro de la señal.
+
+\subsection*{A.2 Transcripción Automática del Contenido Hablado}
+
+Con el objetivo de que el fragmento sintético reproduzca contenido lingüístico extraído
+del propio audio original, se utilizó Whisper \cite{whisper} para transcribir dos
+segmentos de voz diferenciados. El primer segmento, denominado zona~A, fue extraído
+de la primera mitad del audio con una duración mínima de cinco segundos, y su
+transcripción se utilizó para generar el fragmento que sería insertado como empalme.
+El segundo segmento, zona~B, fue extraído de la segunda mitad del audio y su
+transcripción se empleó para generar el segmento de referencia sintético independiente.
+
+La separación entre los contenidos lingüísticos empleados en cada archivo de salida
+responde a un criterio de diseño del conjunto de datos: al utilizar frases diferentes
+provenientes de distintas regiones del audio, se busca que la única fuente de
+discriminación disponible para el modelo sea la huella acústica introducida por el
+proceso de síntesis, y no el contenido lingüístico del fragmento insertado.
+
+\subsection*{A.3 Síntesis de Voz con Clonación del Locutor}
+
+La generación de los fragmentos sintéticos se realizó mediante XTTS~v2
+\cite{xtts_v2}, un modelo de conversión texto-voz (\textit{Text-to-Speech}, TTS) con
+capacidad de clonación de voz a partir de una muestra de referencia. Como señal de
+referencia se utilizaron diez segundos extraídos del segmento central del audio
+original, región que generalmente presenta las condiciones acústicas más estables del
+locutor. Aunque el modelo aproxima las características vocales del hablante, la señal
+producida introduce patrones propios del proceso de síntesis que no están presentes en
+la huella del dispositivo de adquisición original, constituyendo la fuente de información
+que el sistema de detección busca explotar.
+
+\subsection*{A.4 Construcción del Audio con Empalme Sintético}
+
+El fragmento sintético correspondiente a la zona~A fue insertado en la zona de silencio
+seleccionada, produciendo la estructura:
+
+\begin{equation}
+    \text{Audio}_{\text{fake}} = [\text{REAL}_A] + [\text{IA}] + [\text{REAL}_B]
+    \label{eq:estructura}
+\end{equation}
+
+donde $\text{REAL}_A$ y $\text{REAL}_B$ corresponden a los segmentos del audio
+original ubicados antes y después de la zona de inserción, e $\text{IA}$ representa el
+fragmento sintetizado. Para suavizar las transiciones se aplicó un fundido cruzado
+(\textit{crossfade}) de 80~ms en ambos puntos de empalme. Adicionalmente, se
+realizó una normalización de amplitud basada en la raíz cuadrática media entre el
+fragmento sintético y el contexto acústico del audio original:
+
+\begin{equation}
+    g = \frac{\text{RMS}(r[n])}{\text{RMS}(s[n])}
+    \label{eq:rms_gain}
+\end{equation}
+
+donde $r[n]$ corresponde al contexto de referencia extraído del audio real y $s[n]$ al
+fragmento sintetizado. El fragmento normalizado $s'[n] = g \cdot s[n]$ fue insertado en
+la posición seleccionada con el fundido cruzado descrito, reduciendo la posibilidad de
+que diferencias de amplitud triviales sean utilizadas como criterio de detección.
+
+\subsection*{A.5 Adaptación a Condiciones de Grabación con Ruido de Fondo}
+
+Para los audios adquiridos en condiciones ruidosas se incorporó una etapa adicional de
+adaptación ambiental. Dado que XTTS~v2 produce señales en condiciones cercanas al
+silencio, el fragmento sintético puede contrastar con el ruido de fondo del audio real,
+constituyendo una fuente de evidencia trivial para la detección. El perfil de ruido
+$\eta[n]$ fue extraído de las zonas de silencio detectadas por el sistema VAD y
+mezclado con el fragmento sintético normalizado $s'[n]$ aplicando una relación
+señal-ruido (SNR) configurable:
+
+\begin{equation}
+    s_{\text{noisy}}[n] = s'[n] + \alpha \cdot \eta[n]
+    \label{eq:noisy}
+\end{equation}
+
+donde el factor de ganancia $\alpha$ se determina a partir de la SNR objetivo $\rho$
+expresada en decibelios mediante:
+
+\begin{equation}
+    \alpha = \frac{\text{RMS}(s'[n])}{10^{\rho/20} \cdot \text{RMS}(\eta[n])}
+    \label{eq:alpha}
+\end{equation}
+
+Este procedimiento permite que el fragmento insertado presente un perfil espectral más
+coherente con el entorno acústico del dispositivo de grabación original, incrementando
+la dificultad de la detección basada en características superficiales del ruido de fondo.
+
+\subsection*{A.6 Archivos de Salida y Organización del Conjunto de Datos}
+
+Por cada grabación procesada se generaron los siguientes archivos:
+
+\begin{itemize}
+    \item \textbf{Splicing\_IA.wav}: grabación completa con el fragmento sintético
+    insertado, correspondiente a la clase de audio manipulado.
+
+    \item \textbf{IA\_segment.wav}: segmento de referencia sintético generado a partir
+    de la transcripción de la zona~B, con contenido lingüístico diferente al del empalme,
+    destinado a caracterizar la huella acústica de la síntesis de forma aislada.
+
+    \item \textbf{metadata.json}: parámetros del proceso de generación, incluyendo
+    tiempos de inserción, transcripciones de las zonas A y B, regiones de actividad vocal
+    detectadas por VAD y parámetros del empalme aplicado.
+\end{itemize}
+
+Los archivos fueron organizados por dispositivo de grabación, de forma que cada
+subdirectorio contiene únicamente las manipulaciones derivadas de grabaciones
+adquiridas con un mismo equipo. Esta organización facilita la realización de experimentos
+que evalúen la capacidad del sistema para generalizar hacia dispositivos no observados
+durante el entrenamiento.
+
+% ── Referencias del anexo ─────────────────────────────────────────────────────
+\begin{thebibliography}{9}
+
+\bibitem{silero_vad}
+Silero Team, ``Silero VAD: pre-trained enterprise-grade Voice Activity Detector (VAD),
+Number Detector and Language Classifier,'' GitHub, 2021.
+[Online]. Available: \url{https://github.com/snakers4/silero-vad}
+
+\bibitem{whisper}
+A.~Radford, J.~W.~Kim, T.~Xu, G.~Brockman, C.~McLeavey, and I.~Sutskever,
+``Robust speech recognition via large-scale weak supervision,''
+in \textit{Proc. 40th Int. Conf. Machine Learning (ICML)}, 2023.
+[Online]. Available: \url{https://arxiv.org/abs/2212.04356}
+
+\bibitem{xtts_v2}
+E.~Casanova, J.~Weber, C.~Shulby, A.~C.~Junior, E.~Gölge, and M.~A.~Ponti,
+``XTTS: a massively multilingual zero-shot text-to-speech model,''
+in \textit{Proc. Interspeech}, 2024.
+[Online]. Available: \url{https://arxiv.org/abs/2406.04904}
+
+\end{thebibliography}
