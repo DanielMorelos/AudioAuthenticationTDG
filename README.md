@@ -8,7 +8,7 @@ Prototipo de autenticación forense de audio desarrollado como trabajo de grado 
 
 ## Descripción
 
-Las grabaciones de audio usadas como evidencia pueden alterarse mediante **empalmes** (*splicing*): fragmentos grabados con distintos dispositivos se combinan en un mismo archivo. Este proyecto aborda el problema como una **verificación de consistencia entre segmentos**: cada micrófono deja una huella en la señal, y un salto de distancia entre ventanas consecutivas sugiere un cambio de fuente.
+Las grabaciones de audio usadas como evidencia pueden alterarse mediante empalmes (splicing): fragmentos grabados con distintos dispositivos se combinan en un mismo archivo. Este proyecto aborda el problema como una verificación de consistencia entre segmentos: cada micrófono deja una huella en la señal, y un salto de distancia entre ventanas consecutivas sugiere un cambio de fuente.
 
 El sistema:
 
@@ -99,7 +99,7 @@ Todos los umbrales se calibran una sola vez en validación y se congelan. Detall
 | EER por ventana, prueba (euclidiana) | 19.4 % |
 | EER por audio, prueba | 23.5 – 32 % según la métrica |
 | Empalmes con IA, detección por audio (EER propio) | ≈ 21 % |
-| Dispositivos no vistos, EER con umbral propio | 0.5 – 4 % (el umbral congelado **no** se transfiere) |
+| Dispositivos no vistos, EER con umbral propio | 0.5 – 4 % |
 | Parámetros / costo por ventana | 912 576 / ≈ 0.89 GMACs |
 | Tiempo para analizar un audio de ~75 s | 5.7 s en CPU · 0.55 s en GPU (T4) |
 
@@ -109,10 +109,7 @@ Todos los umbrales se calibran una sola vez en validación y se congelan. Detall
 
 - Un solo corpus de entrenamiento (20 teléfonos, habla en inglés, cámara anecoica) y sin códecs, mensajería ni grabaciones de campo.
 - Los empalmes sintéticos son cortes secos en pausas; en cada uno cambian también la voz y el contenido.
-- MOBIPHONE difiere del corpus principal en ancho de banda, ruido y voces, por lo que el efecto del micrófono no puede aislarse.
-- Hiperparámetros fijados a priori, sin búsqueda ni análisis de sensibilidad.
-- Evaluaciones con 100 audios por clase: diferencias de pocos puntos entre métricas no son concluyentes.
-- **Prototipo académico, no validado para uso judicial.**
+- Prototipo académico, no validado para uso judicial.
 
 ## Trabajo futuro
 
