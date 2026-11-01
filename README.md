@@ -119,17 +119,6 @@ Todos los umbrales se calibran una sola vez en validación y se congelan. Detall
 - Evaluación con compresión (MP3, AAC, Opus) y manipulaciones más realistas.
 - Combinación con un detector de artefactos de síntesis para empalmes con IA.
 
-## Cita
-
-```bibtex
-@misc{morelos2026audioauth,
-  author = {Morelos, Daniel},
-  title  = {AudioAuthenticationTDG: Detección y localización de empalmes entre dispositivos móviles mediante aprendizaje de métricas},
-  year   = {2026},
-  url    = {https://github.com/DanielMorelos/AudioAuthenticationTDG}
-}
-```
-
 ## Referencias clave
 
 - Salvi, D. et al. (2024). *POLIPHONE: A dataset for smartphone model identification from audio recordings.* Zenodo.
@@ -138,10 +127,6 @@ Todos los umbrales se calibran una sola vez en validación y se congelan. Detall
 - Leonzio, D. U. et al. (2023). *Audio splicing detection and localization based on acquisition device traces.* IEEE TIFS.
 - Calderón Ardila, E. F. (2023). *Enfoque de aprendizaje de distancias para la detección de cambios de micrófono en archivos de audio.* UIS.
 
-## Licencia
+## Autores
 
-Por definir. Los datos de POLIPHONE se distribuyen bajo CC BY 4.0; consulte las condiciones de uso de MOBIPHONE antes de redistribuirlo.
-
-## Autor
-
-**Daniel Morelos** · Escuela de Ingenierías Eléctrica, Electrónica y Telecomunicaciones (E3T), Universidad Industrial de Santander.
+**Daniel Morelos, Mariana Alean, Carlos Cala** · Escuela de Ingenierías Eléctrica, Electrónica y Telecomunicaciones (E3T), Universidad Industrial de Santander.
