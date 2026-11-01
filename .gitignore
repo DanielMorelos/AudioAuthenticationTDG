@@ -1,0 +1,61 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+env/
+
+# Jupyter / Colab
+.ipynb_checkpoints/
+*.nbconvert.ipynb
+
+# Models and checkpoints (large files)
+*.pt
+*.pth
+*.ckpt
+*.onnx
+checkpoints/
+runs/
+lightning_logs/
+
+# Audio data (downloaded from the data repository)
+*.wav
+*.mp3
+*.flac
+*.m4a
+*.ogg
+original_recordings/
+ia_splicing_audio/
+ia_pure_audio/
+BasededatosAutenticaciondeAudios/
+data/
+
+# Intermediate files / cache
+*.npy
+*.npz
+*.pkl
+*.joblib
+*.h5
+cache/
+tmp/
+
+# Generated results (uncomment to exclude them)
+# results/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+
+# Operating system
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Secrets
+.env
+*.key
