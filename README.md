@@ -108,16 +108,7 @@ Todos los umbrales se calibran una sola vez en validación y se congelan. Detall
 ## Limitaciones
 
 - Un solo corpus de entrenamiento (20 teléfonos, habla en inglés, cámara anecoica) y sin códecs, mensajería ni grabaciones de campo.
-- Los empalmes sintéticos son cortes secos en pausas; en cada uno cambian también la voz y el contenido.
 - Prototipo académico, no validado para uso judicial.
-
-## Trabajo futuro
-
-- Recalibración del umbral con una muestra pequeña del dominio nuevo.
-- Entrenamiento con más dispositivos, condiciones de captura y ruido real.
-- Localización con modelado temporal de la secuencia de distancias y múltiples picos candidatos.
-- Evaluación con compresión (MP3, AAC, Opus) y manipulaciones más realistas.
-- Combinación con un detector de artefactos de síntesis para empalmes con IA.
 
 ## Referencias clave
 
