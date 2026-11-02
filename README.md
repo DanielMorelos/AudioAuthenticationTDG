@@ -129,4 +129,4 @@ Todos los umbrales se calibran una sola vez en validación y se congelan. Detall
 
 ## Autores
 
-**Daniel Morelos, Mariana Alean, Carlos Cala** · Escuela de Ingenierías Eléctrica, Electrónica y Telecomunicaciones (E3T), Universidad Industrial de Santander.
+**Daniel Jeshua Morelos Villamizar, Mariana Aleán Rincón, Carlos Julio Solano Cala. Director: Franklin Alexander Sepúlveda Sepúlveda** · Escuela de Ingenierías Eléctrica, Electrónica y Telecomunicaciones (E3T), Universidad Industrial de Santander.
