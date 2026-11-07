@@ -13,12 +13,12 @@ Las grabaciones de audio usadas como evidencia pueden alterarse mediante empalme
 El sistema:
 
 1. Divide el audio en ventanas de 1 s y calcula espectrogramas STFT (log-potencia, 1025 × 22).
-2. Procesa cada ventana con una CNN 2D de pesos compartidos (estructura siamesa) que produce un *embedding* de 64 dimensiones normalizado en L2.
-3. Calcula la distancia entre embeddings de ventanas consecutivas (salto de 0.25 s). El **máximo** de la secuencia es la puntuación del audio.
-4. Declara el audio empalmado si la puntuación supera un **umbral calibrado por EER** en validación y luego congelado.
+2. Procesa cada ventana con una CNN 2D de pesos compartidos (estructura siamesa) que produce un embedding de 64 dimensiones normalizado en L2.
+3. Calcula la distancia entre embeddings de ventanas consecutivas (salto de 0.25 s). El máximo de la secuencia es la puntuación del audio.
+4. Declara el audio empalmado si la puntuación supera un umbral calibrado por EER en validación y luego congelado.
 5. Localiza el empalme como el instante del pico de distancia.
 
-La red se entrena con **CosFace** usando únicamente segmentos **no vocalizados y ruido de fondo** (detectados con pYIN) del corpus POLIPHONE.
+La red se entrena con CosFace usando únicamente segmentos no vocalizados y ruido de fondo (detectados con pYIN) del corpus POLIPHONE.
 
 ## Estructura del repositorio
 
@@ -26,7 +26,7 @@ La red se entrena con **CosFace** usando únicamente segmentos **no vocalizados 
 |---|---|
 | `training.py` | Clase `Trainer`: bucle de entrenamiento con scheduler, detención temprana, recorte de gradiente y checkpoints reanudables. |
 | `eer_evaluation.py` | Evaluación a nivel de ventana y de audio (EER, FAR, FRR), generación de empalmes sintéticos, estrategias de localización (base, mediana, entropía), evaluación de empalmes con IA y reportes. |
-| Notebook principal | Pipeline completo: carga de datos, partición, extracción de fragmentos no vocalizados, validación cruzada, entrenamiento, calibración, evaluaciones finales, bootstrap y diagnósticos. Pensado para ejecutarse en **Google Colab**. |
+| Notebook principal | Pipeline completo: carga de datos, partición, extracción de fragmentos no vocalizados, validación cruzada, entrenamiento, calibración, evaluaciones finales, bootstrap y diagnósticos. Pensado para ejecutarse en Google Colab. |
 
 ## Datos
 
@@ -104,11 +104,6 @@ Todos los umbrales se calibran una sola vez en validación y se congelan. Detall
 | Tiempo para analizar un audio de ~75 s | 5.7 s en CPU · 0.55 s en GPU (T4) |
 
 **Lectura de los resultados:** el espacio de embeddings separa bien los dispositivos conocidos y conserva el orden de las distancias en dispositivos nuevos, pero el umbral calibrado depende del dominio. Con voz sintetizada por IA el sistema detecta la presencia del empalme a nivel de audio, pero no su ubicación.
-
-## Limitaciones
-
-- Un solo corpus de entrenamiento (20 teléfonos, habla en inglés, cámara anecoica) y sin códecs, mensajería ni grabaciones de campo.
-- Prototipo académico, no validado para uso judicial.
 
 ## Referencias clave
 
